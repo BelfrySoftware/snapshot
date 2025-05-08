@@ -3,6 +3,7 @@ import { escapeIdentifier } from '@snaplet/sdk/cli'
 import type { ConfigToSQL } from './configToSQL.js'
 import type { SubsettingTable, Table } from './types'
 
+const BELFRY_TEST_FIRM_ID = '01411827-bfe8-4c41-ab44-ec594c4670a8'
 export type JoinParams = {
   fromColumns: string[]
   fromTable: Pick<
@@ -76,7 +77,7 @@ function getAnyParamsClause(table: Pick<SubsettingTable, 'partitioned'>) {
 export function buildConfiguredFetchQuery(
   table: Pick<
     SubsettingTable,
-    'primaryKeys' | 'name' | 'schema' | 'partitioned'
+    'primaryKeys' | 'name' | 'schema' | 'partitioned' | 'columns'
   >,
   configSql: ConfigToSQL
 ) {
@@ -85,7 +86,27 @@ export function buildConfiguredFetchQuery(
       (k) => `${escapeIdentifier(table.name)}.${escapeIdentifier(k.name)}::text`
     )
     .join(', ')
+  const tableIdentifier = escapeTableIdentifier(table)
+  const hasFirmId = table.columns.some(({name}) => name === 'firm_id')
+  if (hasFirmId) {
+    if (!configSql.where) {
+      configSql.where = `WHERE ${tableIdentifier}.firm_id = '${BELFRY_TEST_FIRM_ID}'::uuid`
+    } else {
+      configSql.where += `AND ${tableIdentifier}.firm_id = '${BELFRY_TEST_FIRM_ID}'::uuid`
+    }
+  }
 
+  if (table.name === 'firm') {
+    if (!configSql.where) {
+      configSql.where = `WHERE ${tableIdentifier}.id = '${BELFRY_TEST_FIRM_ID}'::uuid`
+    } else {
+      configSql.where += `AND ${tableIdentifier}.id = '${BELFRY_TEST_FIRM_ID}'::uuid`
+    }
+  }
+
+  if (['visitationright', 'visit', 'auditrecord'].includes(table.name)) {
+    configSql.limit = 'LIMIT 0'
+  }
   const query = [
     `SELECT ${getUniqueId(table)}, ${columnsToSelectClause}`,
     `FROM ${escapeTableIdentifier(table)}`,
@@ -94,6 +115,7 @@ export function buildConfiguredFetchQuery(
     ...(configSql.orderBy ? [configSql.orderBy] : []),
     ...(configSql.limit ? [configSql.limit] : []),
   ].join('\n')
+
   return query
 }
 
@@ -101,8 +123,8 @@ export function buildReferencesFetchQuery(
   joinParameters: JoinParams,
   limit?: number
 ) {
-  const parentHasFirmId = (joinParameters.toTable.columns || []).map(({name}) => name).includes('firm_id')
-  const targetHasFirmId = (joinParameters.fromTable.columns || []).map(({name}) => name).includes('firm_id')
+  const parentHasFirmId = (joinParameters.toTable.columns || []).some(({name}) => name === 'firm_id')
+  const targetHasFirmId = (joinParameters.fromTable.columns || []).some(({name}) => name === 'firm_id')
   const targetExpr = joinParameters.fromColumns
     .map((f) => `target.${escapeIdentifier(f)}`)
     .join(', ')
@@ -137,13 +159,13 @@ export function buildReferencesFetchQuery(
   `
   if (parentHasFirmId) {
     query += `
-     AND parent.firm_id='01411827-bfe8-4c41-ab44-ec594c4670a8'::uuid
+     AND parent.firm_id='${BELFRY_TEST_FIRM_ID}'::uuid
     `
   }
 
   if (targetHasFirmId) {
     query += `
-     AND target.firm_id='01411827-bfe8-4c41-ab44-ec594c4670a8'::uuid
+     AND target.firm_id='${BELFRY_TEST_FIRM_ID}'::uuid
     `
   }
 

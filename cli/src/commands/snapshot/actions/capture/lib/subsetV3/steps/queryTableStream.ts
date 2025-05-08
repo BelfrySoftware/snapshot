@@ -81,6 +81,7 @@ function generatePlaceholders(values: Array<Array<string | null>>) {
     return `${acc}${rowIndex > 0 ? ', ' : ''}(${rowPlaceholders})`
   }, '')
 }
+const BELFRY_TEST_FIRM_ID = '01411827-bfe8-4c41-ab44-ec594c4670a8'
 
 function selectRowsQuery(
   table: Pick<SubsettingTable, 'columns' | 'name' | 'schema' | 'primaryKeys'>,
@@ -107,6 +108,7 @@ function selectRowsQuery(
     tablePrimaryKeys
   ).join(',')
   const placeholders = generatePlaceholders(values)
+
   // We use ANY(VALUES) to avoid the 65535 limit of the IN operator
   // and also to avoid the stack overflow error that can happen when
   // using the IN operator with a large number of values since IN operator
@@ -114,9 +116,21 @@ function selectRowsQuery(
   // will allocate a large array in the stack.
   // Where the ANY(VALUES) will create a temporary table and perform a join
   // working onto memory instead of the stack.
-  return `SELECT ${columnsListSelector}
+  let q = `SELECT ${columnsListSelector}
   FROM ${escapeIdentifier(table.schema)}.${escapeIdentifier(table.name)}
   WHERE (${primaryKeysListSelector}) = ANY(VALUES ${placeholders})`
+
+  if (table.name === 'firm') {
+    q += ` AND id='${BELFRY_TEST_FIRM_ID}'::uuid`
+  } else if (table.columns.some(({name}) => name === 'firm_id')) {
+    q += ` AND firm_id='${BELFRY_TEST_FIRM_ID}'::uuid`
+  }
+
+  if (['visitationright', 'visit', 'auditrecord'].includes(table.name)) {
+    q += ' LIMIT 0'
+  }
+
+  return q
 }
 
 // Will copy the entire table
@@ -127,10 +141,22 @@ export const queryTableStream = (
   const columnsListSelector = generateColumnsSelector(
     table.columns.filter(isCopyable)
   ).join(', ')
-  const query = `COPY (SELECT ${columnsListSelector} FROM ${escapeIdentifier(
+  let q = `COPY (SELECT ${columnsListSelector} FROM ${escapeIdentifier(
     table.schema
-  )}.${escapeIdentifier(table.name)}) TO STDOUT CSV HEADER`
-  return client.query(pgCopy.to(query))
+  )}.${escapeIdentifier(table.name)}`
+
+  if (table.name === 'firm') {
+    q += ` WHERE id='${BELFRY_TEST_FIRM_ID}'::uuid`
+  } else if (table.columns.some(({name}) => name === 'firm_id')) {
+    q += ` WHERE firm_id='${BELFRY_TEST_FIRM_ID}'::uuid`
+  }
+
+  if (['visitationright', 'visit', 'auditrecord'].includes(table.name)) {
+    q += ' LIMIT 0'
+  }
+
+  q += ') TO STDOUT CSV HEADER'
+  return client.query(pgCopy.to(q))
 }
 
 // Will copy a subset of the table

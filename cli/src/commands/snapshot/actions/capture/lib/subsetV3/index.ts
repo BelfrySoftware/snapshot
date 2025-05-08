@@ -67,7 +67,7 @@ async function discoverRootTable(
   targetIndex: string,
   table: Pick<
     SubsettingTable,
-    'id' | 'primaryKeys' | 'name' | 'schema' | 'partitioned'
+    'id' | 'primaryKeys' | 'name' | 'schema' | 'partitioned' | 'columns'
   >,
   condition: ConfigToSQL
 ): Promise<TableSegment[] | undefined> {

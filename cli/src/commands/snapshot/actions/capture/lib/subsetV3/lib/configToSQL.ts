@@ -9,18 +9,25 @@ export type ConfigToSQL = {
   limit?: string
   orderBy?: string
 }
+const BELFRY_TEST_FIRM_ID = '01411827-bfe8-4c41-ab44-ec594c4670a8'
+
 
 async function getPreciseCount(
   client: DatabaseClient,
-  table: { schema: string; name: string }
+  table: { schema: string; name: string, columns: {name: string}[] }
 ) {
-  const {
-    rows: [{ count }],
-  } = await client.query<{ count: number }>(
-    `SELECT COUNT(*) as count FROM ${client.escapeIdentifier(
+  let query = `SELECT COUNT(*) as count FROM ${client.escapeIdentifier(
       table.schema
     )}.${client.escapeIdentifier(table.name)}`
-  )
+
+  if (table.name === 'firm') {
+    query += ` WHERE id='${BELFRY_TEST_FIRM_ID}'::uuid`
+  } else if (table.columns.some(({name}) => name === 'firm_id')) {
+    query += ` WHERE firm_id='${BELFRY_TEST_FIRM_ID}'::uuid`
+  }
+  const {
+    rows: [{ count }],
+  } = await client.query<{ count: number }>(query)
 
   return count
 }
@@ -28,7 +35,7 @@ async function getPreciseCount(
 export async function configToSQL(
   client: DatabaseClient,
   configTarget: SubsetConfig['targets'][number],
-  target: Pick<Table, 'id' | 'schema' | 'name'>
+  target: Pick<Table, 'id' | 'schema' | 'name' | 'columns'>
 ) {
   const sql: ConfigToSQL = {}
   let subsetRowCount: number | undefined

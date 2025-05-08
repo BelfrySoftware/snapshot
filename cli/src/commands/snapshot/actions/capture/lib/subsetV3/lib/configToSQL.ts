@@ -47,7 +47,6 @@ export async function configToSQL(
     const count = await getPreciseCount(client, target)
     subsetRowCount = Math.min(count, configTarget.rowLimit)
   }
-
   if (subsetRowCount) {
     sql.limit = `LIMIT ${subsetRowCount}`
   }

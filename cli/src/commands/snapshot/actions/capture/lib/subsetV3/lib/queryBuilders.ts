@@ -7,12 +7,12 @@ export type JoinParams = {
   fromColumns: string[]
   fromTable: Pick<
     SubsettingTable,
-    'id' | 'primaryKeys' | 'name' | 'schema' | 'partitioned'
+    'id' | 'primaryKeys' | 'name' | 'schema' | 'partitioned' | 'columns'
   >
   toColumns: string[]
   toTable: Pick<
     SubsettingTable,
-    'id' | 'primaryKeys' | 'name' | 'schema' | 'partitioned'
+    'id' | 'primaryKeys' | 'name' | 'schema' | 'partitioned' | 'columns'
   >
 }
 
@@ -101,6 +101,8 @@ export function buildReferencesFetchQuery(
   joinParameters: JoinParams,
   limit?: number
 ) {
+  const parentHasFirmId = (joinParameters.toTable.columns || []).map(({name}) => name).includes('firm_id')
+  const targetHasFirmId = (joinParameters.fromTable.columns || []).map(({name}) => name).includes('firm_id')
   const targetExpr = joinParameters.fromColumns
     .map((f) => `target.${escapeIdentifier(f)}`)
     .join(', ')
@@ -120,7 +122,7 @@ export function buildReferencesFetchQuery(
       'IS NOT DISTINCT FROM'
     : '='
   const limitSql = limit !== undefined ? `LIMIT ${limit}` : ''
-  const query = `
+  let query = `
     SELECT
       ${getUniqueId(joinParameters.toTable, {
         tableAlias: 'parent',
@@ -132,6 +134,20 @@ export function buildReferencesFetchQuery(
       tableAlias: 'target',
       whereClause: true,
     })} = ANY(${getAnyParamsClause(joinParameters.fromTable)})
+  `
+  if (parentHasFirmId) {
+    query += `
+     AND parent.firm_id='01411827-bfe8-4c41-ab44-ec594c4670a8'::uuid
+    `
+  }
+
+  if (targetHasFirmId) {
+    query += `
+     AND target.firm_id='01411827-bfe8-4c41-ab44-ec594c4670a8'::uuid
+    `
+  }
+
+  query += `
     ORDER BY 1
     ${limitSql};
   `

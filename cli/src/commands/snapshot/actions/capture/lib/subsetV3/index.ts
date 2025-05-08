@@ -112,6 +112,7 @@ async function discoverReference(
       primaryKeys: toTable.primaryKeys,
       name: toTable.name,
       schema: toTable.schema,
+      columns: toTable.columns,
       partitioned: toTable.partitioned,
     },
     toColumns: reference.targetColumns,
@@ -120,6 +121,7 @@ async function discoverReference(
       primaryKeys: referenceTable.primaryKeys,
       name: referenceTable.name,
       schema: referenceTable.schema,
+      columns: referenceTable.columns,
       partitioned: referenceTable.partitioned,
     },
   }
